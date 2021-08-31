@@ -1,10 +1,13 @@
 const axios = require("axios").default;
 const { GoogleSpreadsheet } = require("google-spreadsheet");
+const { promisify } = require("util");
 
 const { spreadsheet_id, webhook_link, api_key } = require("../config.json");
 
 let prevOnline = [],
 	prevOffline = [];
+
+const sleep = promisify(setTimeout);
 
 const parseMascotData = (rows) =>
 	rows.map((row) => ({
@@ -37,16 +40,31 @@ const main = async () => {
 	const doc = new GoogleSpreadsheet(spreadsheet_id);
 
 	await doc.useApiKey(api_key);
-
 	await doc.loadInfo();
+
+	let sent_rate_limit_message = false;
 
 	const sheet = doc.sheetsByIndex[0];
 	const run = async () => {
 		let rows = [];
 		try {
 			rows = await sheet.getRows();
-		} catch (err) {
-			await executeWebhook({ content: "I am getting rate limited" });
+			if (sent_rate_limit_message) sent_rate_limit_message = false;
+		} catch (error) {
+			if (error.isAxiosError && error.response.status === 429) {
+				if (!sent_rate_limit_message) {
+					await executeWebhook({
+						content: "I am getting rate limited",
+					});
+					sent_rate_limit_message = true;
+				}
+				console.log(JSON.stringify(error.response.data, null, 4));
+			} else {
+				console.log(error);
+			}
+
+			await sleep(5e3);
+
 			return;
 		}
 
@@ -98,8 +116,12 @@ const main = async () => {
 		prevOffline = mascots.filter((o) => o.server === "Offline");
 	};
 
-	setInterval(run, 2e3);
-	run();
+	const waitOnFunction = async (f, delay = 3e3) => {
+		await f();
+		await sleep(delay);
+		return waitOnFunction(f, delay);
+	};
+	waitOnFunction(run);
 };
 
 main();
