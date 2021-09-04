@@ -1,11 +1,13 @@
 const axios = require("axios").default;
 const { GoogleSpreadsheet } = require("google-spreadsheet");
 const { promisify } = require("util");
+const { join } = require("path");
+const fs = require("fs/promises");
 
 const { spreadsheet_id, webhook_link, api_key } = require("../config.json");
 
-let prevOnline = [],
-	prevOffline = [];
+let prev_online = [],
+	prev_offline = [];
 
 const sleep = promisify(setTimeout);
 
@@ -47,6 +49,7 @@ const main = async () => {
 	await doc.loadInfo();
 
 	let sent_rate_limit_message = false;
+	let prev_mascots = [];
 
 	const sheet = doc.sheetsByIndex[0];
 	const run = async () => {
@@ -74,8 +77,26 @@ const main = async () => {
 
 		const mascots = parseMascotData(rows);
 
-		if (prevOffline.length === 0 && prevOnline.length === 0)
-			prevOffline = mascots;
+		if (
+			prev_mascots.length === 0 ||
+			mascots.some((mascot) => {
+				const foundMascot = prev_mascots.find(
+					(m) => m.name === mascot.name
+				);
+				if (!foundMascot) return true;
+				if (foundMascot.server === mascot.server) return false;
+				return true;
+			})
+		) {
+			await fs.writeFile(
+				join(process.cwd(), "rows", `${Date.now()}.json`),
+				JSON.stringify(mascots, null, 4)
+			);
+			prev_mascots = mascots.slice();
+		}
+
+		if (prev_offline.length === 0 && prev_online.length === 0)
+			prev_offline = mascots;
 
 		const online = mascots
 				.filter(
@@ -85,7 +106,7 @@ const main = async () => {
 						!o.room.startsWith("Last visited")
 				)
 				.filter(
-					(o) => !prevOnline.find((mascot) => mascot.name === o.name)
+					(o) => !prev_online.find((mascot) => mascot.name === o.name)
 				),
 			offline = mascots
 				.filter(
@@ -94,7 +115,8 @@ const main = async () => {
 						o.room.startsWith("Last visited")
 				)
 				.filter(
-					(o) => !prevOffline.find((mascot) => mascot.name === o.name)
+					(o) =>
+						!prev_offline.find((mascot) => mascot.name === o.name)
 				);
 
 		if (online.length === 0 && offline.length === 0) return;
@@ -128,10 +150,10 @@ const main = async () => {
 			console.error("Error executing webhook:", err.response.data);
 		}
 
-		prevOnline = mascots.filter(
+		prev_online = mascots.filter(
 			(o) => o.server !== "" && o.server !== "Offline"
 		);
-		prevOffline = mascots.filter((o) => o.server === "Offline");
+		prev_offline = mascots.filter((o) => o.server === "Offline");
 	};
 
 	const waitOnFunction = async (f, delay = 5e3) => {
