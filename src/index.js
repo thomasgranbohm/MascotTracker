@@ -10,11 +10,13 @@ let prevOnline = [],
 const sleep = promisify(setTimeout);
 
 const parseMascotData = (rows) =>
-	rows.map((row) => ({
-		name: row.Mascot,
-		room: row.Room,
-		server: row["Enter the server below:"],
-	}));
+	rows
+		.map((row) => ({
+			name: row.Mascot,
+			room: row["Enter room override below:"],
+			server: row["Enter the server below:"],
+		}))
+		.filter((mascot) => mascot.name !== "");
 
 const generateEmbed = (mascot, online = false) => ({
 	title: `${mascot.name} went ${
@@ -22,7 +24,9 @@ const generateEmbed = (mascot, online = false) => ({
 	}`,
 	url: online ? "https://play.cprewritten.net" : null,
 	footer: {
-		text: online ? `🌎 ${mascot.server} 🏠 ${mascot.room}` : null,
+		text: online
+			? `🌎 ${mascot.server} 🏠 ${mascot.room || "Tracking..."}`
+			: null,
 	},
 	color: online ? 5814783 : 16074818,
 	timestamp: new Date().toISOString(),
@@ -74,15 +78,28 @@ const main = async () => {
 			prevOffline = mascots;
 
 		const online = mascots
-				.filter((o) => o.server !== "" && o.server !== "Offline")
+				.filter(
+					(o) =>
+						o.server !== "Offline" &&
+						o.room !== "" &&
+						!o.room.startsWith("Last visited")
+				)
 				.filter(
 					(o) => !prevOnline.find((mascot) => mascot.name === o.name)
 				),
 			offline = mascots
-				.filter((o) => o.server === "Offline")
+				.filter(
+					(o) =>
+						o.server === "Offline" ||
+						o.room.startsWith("Last visited")
+				)
 				.filter(
 					(o) => !prevOffline.find((mascot) => mascot.name === o.name)
 				);
+
+		if (online.length === 0 && offline.length === 0) return;
+
+		console.table(online);
 
 		const embeds = [
 			...offline.map((mascot) => generateEmbed(mascot)),
@@ -105,7 +122,8 @@ const main = async () => {
 		].forEach(console.log);
 
 		try {
-			await executeWebhook({ embeds });
+			if (process.env.NODE_ENV === "production")
+				await executeWebhook({ embeds });
 		} catch (err) {
 			console.error("Error executing webhook:", err.response.data);
 		}
@@ -116,7 +134,7 @@ const main = async () => {
 		prevOffline = mascots.filter((o) => o.server === "Offline");
 	};
 
-	const waitOnFunction = async (f, delay = 3e3) => {
+	const waitOnFunction = async (f, delay = 5e3) => {
 		await f();
 		await sleep(delay);
 		return waitOnFunction(f, delay);
