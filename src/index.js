@@ -58,7 +58,11 @@ const main = async () => {
 			rows = await sheet.getRows();
 			if (sent_rate_limit_message) sent_rate_limit_message = false;
 		} catch (error) {
-			if (error.isAxiosError && error.response.status === 429) {
+			if (
+				error.isAxiosError &&
+				error.response &&
+				error.response.status === 429
+			) {
 				if (!sent_rate_limit_message) {
 					await executeWebhook({
 						content: "I am getting rate limited",
