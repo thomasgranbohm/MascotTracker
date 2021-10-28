@@ -4,11 +4,14 @@
 
 Sends a message in a Discord channel when a mascot has logged on or off in Club Penguin Rewritten.
 
-## Setup
+## Running with docker
 
-1. Copy `example-config.json` to `example.json`
-2. Replace the example values with your values
-3. Run `node src/index.js`
+```bash
+docker run -e API_KEY=<your Google API Key> \
+	-e SPREADSHEET_ID=16LNCYZPJVZ6NI4BpnwRrhSzPb2EMVWRFgvFBeVaUy1I \
+	-e WEBHOOK_LINK=<your Discord Webhook link> \
+	-d thomasgranbohm/mascot-tracker
+```
 
 ## Credits
 
