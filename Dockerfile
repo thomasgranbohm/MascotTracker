@@ -11,4 +11,6 @@ COPY . .
 
 ENV NODE_ENV production
 
-CMD ["node", "--max-old-space-size=16384",  "src/index.js"]
+RUN yarn build
+
+CMD ["node", "--max-old-space-size=16384",  "build/"]

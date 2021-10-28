@@ -1,8 +1,13 @@
 import axios, { AxiosRequestConfig } from "axios";
 import { GoogleSpreadsheet, GoogleSpreadsheetRow } from "google-spreadsheet";
-import { Embed, Mascot, MascotEmbed, OnlineType, WebhookMessage } from "types";
+import { Embed, Mascot, OnlineType, WebhookMessage } from "types";
 import { promisify } from "util";
-import { spreadsheet_id, webhook_link, api_key } from "../config.json";
+
+const { API_KEY, SPREADSHEET_ID, WEBHOOK_LINK } = process.env;
+if (!API_KEY || !SPREADSHEET_ID || !WEBHOOK_LINK) {
+  console.log("Please fill in the every environment variable before running!");
+  process.exit(1);
+}
 
 const sleep = promisify(setTimeout);
 
@@ -24,7 +29,7 @@ const executeWebhook = async (
 ) => {
   try {
     const resp = await axios({
-      url: webhook_link,
+      url: WEBHOOK_LINK,
       ...options,
       data,
       headers: {
@@ -67,7 +72,7 @@ const updateMessage = async (key: string, value: OnlineType) => {
       embeds: [generateEmbed(key, value)],
     },
     {
-      url: `${webhook_link}/messages/${messageId}`,
+      url: `${WEBHOOK_LINK}/messages/${messageId}`,
       method: "patch",
     }
   );
@@ -105,9 +110,9 @@ const printMascot = (
     if (o.length === 2 && o[1]) return `${o[1]}, ${o[0]}`;
     if (o.length === 1 || (o.length === 2 && !o[1])) return o[0];
   };
-  return `${name}: ${parseOnlineValue(oldValue)} -> ${parseOnlineValue(
-    newValue
-  )}`;
+  return `${new Date().toLocaleString("sv")} ${name}: ${parseOnlineValue(
+    oldValue
+  )} -> ${parseOnlineValue(newValue)}`;
 };
 
 const getChanges = async () => {
@@ -170,9 +175,9 @@ const prevCollection = new Map<string, OnlineType>(collection);
 const embeds = new Map<string, string>();
 
 const main = async () => {
-  const doc = new GoogleSpreadsheet(spreadsheet_id);
+  const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
 
-  await doc.useApiKey(api_key);
+  await doc.useApiKey(API_KEY);
   await doc.loadInfo();
 
   let rateLimited = false;
