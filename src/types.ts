@@ -24,5 +24,11 @@ export type WebhookMessage = {
   username?: string;
   avatar_url?: string;
   tts?: boolean;
-  embeds: Embed[];
-};
+} & (
+  | {
+      embeds: Embed[];
+    }
+  | {
+      content: string;
+    }
+);

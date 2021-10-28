@@ -1,31 +1,10 @@
 import axios, { AxiosRequestConfig } from "axios";
+import { GoogleSpreadsheet, GoogleSpreadsheetRow } from "google-spreadsheet";
 import { Embed, Mascot, MascotEmbed, OnlineType, WebhookMessage } from "types";
+import { promisify } from "util";
 import { spreadsheet_id, webhook_link, api_key } from "../config.json";
 
-const generateRandomId = (length: number = 8): string | number => {
-  const result = [];
-  const characters =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  const charactersLength = characters.length;
-  for (let i = 0; i < length; i++) {
-    result.push(
-      characters.charAt(Math.floor(Math.random() * charactersLength))
-    );
-  }
-  return result.join("");
-};
-
-const mascots: Mascot[] = [
-  {
-    name: "Aunt Arctic",
-  },
-  {
-    name: "Herbert",
-  },
-  {
-    name: "Jetpack Guy",
-  },
-];
+const sleep = promisify(setTimeout);
 
 const generateEmbed = (key: string, value: OnlineType): Embed => ({
   title: `${key} went ${!!value ? `online in ${value[0]}` : "offline."}`,
@@ -123,8 +102,8 @@ const printMascot = (
 ) => {
   const parseOnlineValue = (o: OnlineType) => {
     if (o === undefined) return "Offline";
-    if (o.length === 1) return `${o[0]}`;
-    if (o.length === 2) return `${o[1]}, ${o[0]}`;
+    if (o.length === 2 && o[1]) return `${o[1]}, ${o[0]}`;
+    if (o.length === 1 || (o.length === 2 && !o[1])) return o[0];
   };
   return `${name}: ${parseOnlineValue(oldValue)} -> ${parseOnlineValue(
     newValue
@@ -165,24 +144,84 @@ const updateCollections = (key: string, newValue: OnlineType) => {
   collection.set(key, newValue);
 };
 
+const parseMascotData = (rows: GoogleSpreadsheetRow[]): Mascot[] =>
+  rows
+    .filter((row) => {
+      if (row["Mascot"]) return row;
+    })
+    .map(
+      (row): Mascot => ({
+        name: row["Mascot"],
+        online:
+          row["Enter the server below:"] !== "Offline"
+            ? row["Enter room override below:"].startsWith("Last visited")
+              ? [row["Enter the server below:"]]
+              : [
+                  row["Enter the server below:"],
+                  row["Enter room override below:"],
+                ]
+            : undefined,
+      })
+    )
+    .filter((mascot) => mascot.name !== "");
+
 const collection = new Map<string, OnlineType>();
-for (const { name, online } of mascots) {
-  collection.set(name, online);
-}
 const prevCollection = new Map<string, OnlineType>(collection);
 const embeds = new Map<string, string>();
 
-const main = () => {
-  getChanges();
-  setInterval(getChanges, 1e3);
+const main = async () => {
+  const doc = new GoogleSpreadsheet(spreadsheet_id);
 
-  setTimeout(() => updateCollections("Jetpack Guy", ["Blizzard", "Dock"]), 2e3);
-  setTimeout(() => updateCollections("Herbert", ["Sleet", "Dock"]), 3e3);
-  setTimeout(() => updateCollections("Jetpack Guy", ["Sleet", "Dock"]), 4e3);
-  setTimeout(() => updateCollections("Herbert", ["Sleet", "Coffee Shop"]), 5e3);
-  setTimeout(() => updateCollections("Jetpack Guy", undefined), 6e3);
+  await doc.useApiKey(api_key);
+  await doc.loadInfo();
 
-  setTimeout(() => process.exit(0), 6e3);
+  let rateLimited = false;
+
+  const sheet = doc.sheetsByIndex[0];
+
+  const run = async () => {
+    let rows = [];
+    try {
+      rows = await sheet.getRows();
+    } catch (error: any) {
+      if (error.isAxiosError && error.response) {
+        if (error.response.status === 429) {
+          if (!rateLimited) {
+            await executeWebhook({
+              content: "I am getting rate limited",
+            });
+            rateLimited = true;
+          }
+        } else if (
+          error.response.status === 503 ||
+          error.response.status === 502
+        ) {
+          console.log("Temporary Google API Error");
+        }
+        console.log(JSON.stringify(error.response.data, null, 4));
+      } else {
+        console.log(error);
+      }
+
+      await sleep(5e3);
+
+      return;
+    }
+
+    const mascots = parseMascotData(rows);
+    for (const { name, online } of mascots) {
+      updateCollections(name, online);
+    }
+
+    getChanges();
+  };
+
+  const waitOnFunction = async (f: Function, delay = 5e3): Promise<void> => {
+    await f();
+    await sleep(delay);
+    return waitOnFunction(f, delay);
+  };
+  waitOnFunction(run);
 };
 
 main();
