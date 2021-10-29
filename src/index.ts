@@ -19,7 +19,7 @@ const generateEmbed = (key: string, value: OnlineType): Embed => ({
   timestamp: new Date(),
   footer: {
     text: !!value
-      ? `🌍 ${value[0]}${value[1] ? `🏡 ${value[1]}` : ""}`
+      ? `🌍 ${value[0]}${value[1] ? ` 🏡 ${value[1]}` : ""}`
       : undefined,
   },
 });
