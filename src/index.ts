@@ -1,4 +1,5 @@
 import axios, { AxiosRequestConfig } from "axios";
+import { blue, bold, green, red } from "colors";
 import { GoogleSpreadsheet, GoogleSpreadsheetRow } from "google-spreadsheet";
 import { Embed, Mascot, OnlineType, WebhookMessage } from "types";
 import { promisify } from "util";
@@ -18,7 +19,7 @@ const generateEmbed = (key: string, value: OnlineType): Embed => ({
   timestamp: new Date(),
   footer: {
     text: !!value
-      ? `🌍 ${value[0]} 🏡 ${value[1] || "Tracking..."}`
+      ? `🌍 ${value[0]}${value[1] ? `🏡 ${value[1]}` : ""}`
       : undefined,
   },
 });
@@ -109,10 +110,11 @@ const printMascot = (
     if (o === undefined) return "Offline";
     if (o.length === 2 && o[1]) return `${o[1]}, ${o[0]}`;
     if (o.length === 1 || (o.length === 2 && !o[1])) return o[0];
+    return o.toString();
   };
-  return `${new Date().toLocaleString("sv")} ${name}: ${parseOnlineValue(
-    oldValue
-  )} -> ${parseOnlineValue(newValue)}`;
+  return `${blue(new Date().toLocaleString("sv"))} ${bold.white(name)}: ${red(
+    parseOnlineValue(oldValue)
+  )} -> ${green(parseOnlineValue(newValue))}`;
 };
 
 const getChanges = async () => {

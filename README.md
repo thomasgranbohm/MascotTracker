@@ -4,7 +4,7 @@
 
 Sends a message in a Discord channel when a mascot has logged on or off in Club Penguin Rewritten.
 
-## Running with docker
+## Run with docker
 
 ```bash
 docker run -e API_KEY=<your Google API Key> \
