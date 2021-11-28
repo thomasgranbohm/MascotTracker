@@ -4,20 +4,22 @@ import { GoogleSpreadsheet, GoogleSpreadsheetRow } from "google-spreadsheet";
 import { Embed, Mascot, OnlineType, WebhookMessage } from "types";
 import { format, promisify } from "util";
 
-const log = (message?: any, ...optionalParams: any[]) =>
-  console.log(
-    blue(new Date().toLocaleString("sv")),
-    format(message, ...optionalParams)
-  );
-const error = (message?: any, ...optionalParams: any[]) =>
-  console.error(
-    red(new Date().toLocaleString("sv")),
-    format(message, ...optionalParams)
-  );
+namespace Logger {
+  export const log = (message?: any, ...optionalParams: any[]) =>
+    console.log(
+      blue(new Date().toLocaleString("sv")),
+      format(message, ...optionalParams)
+    );
+  export const error = (message?: any, ...optionalParams: any[]) =>
+    console.error(
+      red(new Date().toLocaleString("sv")),
+      format(message, ...optionalParams)
+    );
+}
 
 const { API_KEY, SPREADSHEET_ID, WEBHOOK_LINK } = process.env;
 if (!API_KEY || !SPREADSHEET_ID || !WEBHOOK_LINK) {
-  log("Please fill in the every environment variable before running!");
+  Logger.log("Please fill in the every environment variable before running!");
   process.exit(1);
 }
 
@@ -28,14 +30,14 @@ process.on("beforeExit", (code) => {
     executeWebhook({
       content: "I'm dying lmao...",
     })
-      .catch(() => error("Could not send error webhook."))
+      .catch(() => Logger.error("Could not send error webhook."))
       .finally(() => process.exit(code));
   } else {
     process.exit(code);
   }
 });
 
-process.on("exit", (code) => log("Exited with code %d", code));
+process.on("exit", (code) => Logger.log("Exited with code %d", code));
 
 const generateEmbed = (key: string, value: OnlineType): Embed => ({
   title: `${key} went ${!!value ? `online in ${value[0]}` : "offline."}`,
@@ -151,7 +153,7 @@ const getChanges = async () => {
     prevCollection.set(key, newValue);
 
     // Print change message
-    log(printMascot(key, oldValue, newValue));
+    Logger.log(printMascot(key, oldValue, newValue));
 
     // Just went online or offline. e.g. send a new message
     if (newValue === undefined || oldValue === undefined) {
@@ -221,7 +223,7 @@ const main = async () => {
       if (error.isAxiosError && error.response) {
         if (error.response.status === 429) {
           if (!rateLimited) {
-            log("Rate-limit Error");
+            Logger.log("Rate-limit Error");
             await executeWebhook({
               content: "I am getting rate limited",
             });
@@ -231,7 +233,7 @@ const main = async () => {
           error.response.status === 503 ||
           error.response.status === 502
         ) {
-          log("Temporary Google API Error %d", error.response.status);
+          Logger.log("Temporary Google API Error %d", error.response.status);
         }
         error(JSON.stringify(error.response.data, null, 4));
       } else {
@@ -258,7 +260,7 @@ const main = async () => {
     return waitOnFunction(f, delay);
   };
   waitOnFunction(run);
-  log(bold("Started!"));
+  Logger.log(bold("Started!"));
 };
 
 main();
