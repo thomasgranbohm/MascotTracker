@@ -235,10 +235,10 @@ const main = async () => {
         ) {
           Logger.log("Temporary Google API Error %d", error.response.status);
         }
-        error(JSON.stringify(error.response.data, null, 4));
+        Logger.error(JSON.stringify(error.response.data, null, 4));
       } else {
-        error("Error while getting rows!");
-        error(error);
+        Logger.error("Error while getting rows!");
+        Logger.error(error);
       }
 
       await sleep(5e3);
